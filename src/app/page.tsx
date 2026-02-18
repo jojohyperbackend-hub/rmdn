@@ -33,8 +33,8 @@ export default function Page() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  // Puasa / Mokel mode
-  const [mokel, setMokel] = useState(false);
+  // Mokel per day
+  const [mokelDays, setMokelDays] = useState<number[]>([]);
 
   // Form states
   const [todo, setTodo] = useState("");
@@ -148,8 +148,8 @@ export default function Page() {
 
   if (!user)
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
-        <h1 className="text-3xl font-bold mb-6">Login with Google</h1>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
+        <h1 className="text-3xl font-bold mb-6 text-center">Login with Google</h1>
         <button
           onClick={login}
           className="bg-yellow-600 hover:bg-yellow-500 transition px-6 py-3 rounded shadow-lg text-xl neon-glow"
@@ -160,18 +160,18 @@ export default function Page() {
     );
 
   return (
-    <div className="p-6 max-w-5xl mx-auto min-h-screen bg-gray-900 text-white">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto min-h-screen bg-gray-900 text-white flex flex-col gap-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <h1 className="text-3xl font-bold">Dashboard Ramadan</h1>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 flex-wrap">
           <button
-            onClick={() => setMokel(!mokel)}
+            onClick={() => selectedDay && setMokelDays(prev => prev.includes(selectedDay) ? prev.filter(d => d !== selectedDay) : [...prev, selectedDay])}
             className={`px-4 py-2 rounded transition ${
-              mokel ? "bg-purple-600 hover:bg-purple-500" : "bg-green-600 hover:bg-green-500"
+              selectedDay && mokelDays.includes(selectedDay) ? "bg-purple-600 hover:bg-purple-500" : "bg-green-600 hover:bg-green-500"
             }`}
           >
-            {mokel ? "Mokel Mode" : "Puasa Mode"}
+            {selectedDay && mokelDays.includes(selectedDay) ? `Mokel Day ${selectedDay}` : `Puasa Day ${selectedDay || ""}`}
           </button>
           <button onClick={logout} className="bg-red-600 px-4 py-2 rounded hover:bg-red-500 transition">
             Logout
@@ -180,14 +180,15 @@ export default function Page() {
       </div>
 
       {/* Kalender */}
-      <div className="grid grid-cols-7 gap-2 mb-4">
+      <div className="grid grid-cols-7 gap-2">
         {tasksByDay.map((dayTasks, idx) => {
           const day = idx + 1;
+          const isMokel = mokelDays.includes(day);
           let color = "bg-gray-800";
-          if (!dayTasks.length) color = mokel ? "bg-purple-600" : "bg-red-600";
+          if (!dayTasks.length) color = isMokel ? "bg-purple-600" : "bg-red-600";
           else {
             const maxProgress = Math.max(...dayTasks.map((t) => t.progress));
-            color = STATUS_COLOR(maxProgress, mokel);
+            color = STATUS_COLOR(maxProgress, isMokel);
           }
           return (
             <button
@@ -196,7 +197,7 @@ export default function Page() {
               className={`p-4 rounded shadow text-white font-semibold ${color} hover:scale-105 transition relative`}
             >
               {day}
-              {dayTasks.some((t) => t.progress === 100) && !mokel && (
+              {dayTasks.some((t) => t.progress === 100) && !isMokel && (
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-400" />
               )}
             </button>
@@ -206,47 +207,43 @@ export default function Page() {
 
       {/* Selected Day Forms */}
       {selectedDay && (
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-2">Day {selectedDay} Tasks</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(["todo","hapalan","planner","chat"] as TaskType[]).map((t) => {
-              const value = t === "todo" ? todo : t === "hapalan" ? hapalan : t === "planner" ? planner : chat;
-              const setValue = t === "todo" ? setTodo : t === "hapalan" ? setHapalan : t === "planner" ? setPlanner : setChat;
-              return (
-                <form
-                  key={t}
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSubmit(t, value);
-                  }}
-                  className="flex flex-col gap-2 p-4 bg-gray-800 rounded shadow-md hover:shadow-lg transition"
-                >
-                  <h3 className="font-semibold text-lg">{t.charAt(0).toUpperCase() + t.slice(1)}</h3>
-                  <input
-                    value={value}
-                    onChange={(e) => setValue(e.target.value)}
-                    placeholder={t}
-                    className="p-2 rounded bg-gray-700 focus:ring-2 focus:ring-yellow-500 outline-none"
-                  />
-                  <button type="submit" className="bg-yellow-500 hover:bg-yellow-400 transition px-4 py-2 rounded">
-                    {editingId ? "Update" : "Add"} {t}
-                  </button>
-                </form>
-              );
-            })}
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {(["todo","hapalan","planner","chat"] as TaskType[]).map((t) => {
+            const value = t === "todo" ? todo : t === "hapalan" ? hapalan : t === "planner" ? planner : chat;
+            const setValue = t === "todo" ? setTodo : t === "hapalan" ? setHapalan : t === "planner" ? setPlanner : setChat;
+            return (
+              <form
+                key={t}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSubmit(t, value);
+                }}
+                className="flex flex-col gap-2 p-4 bg-gray-800 rounded shadow-md hover:shadow-lg transition"
+              >
+                <h3 className="font-semibold text-lg">{t.charAt(0).toUpperCase() + t.slice(1)}</h3>
+                <input
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder={t}
+                  className="p-2 rounded bg-gray-700 focus:ring-2 focus:ring-yellow-500 outline-none"
+                />
+                <button type="submit" className="bg-yellow-500 hover:bg-yellow-400 transition px-4 py-2 rounded">
+                  {editingId ? "Update" : "Add"} {t}
+                </button>
+              </form>
+            );
+          })}
         </div>
       )}
 
       {/* Summary */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">Summary</h2>
-        <div className="flex flex-wrap gap-4">
+      <div className="flex flex-col md:flex-row gap-4 flex-wrap">
+        <div className="flex flex-col gap-2 w-full md:w-auto">
           <div className="px-4 py-2 bg-red-700 rounded">Not Ready: {statusCount.notReady}</div>
           <div className="px-4 py-2 bg-yellow-600 rounded">In Process: {statusCount.inProcess}</div>
           <div className="px-4 py-2 bg-green-600 rounded">Success: {statusCount.success}</div>
         </div>
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 flex-1">
           {(["todo","hapalan","planner","chat"] as TaskType[]).map((type) => (
             <div key={type} className="p-2 bg-gray-800 rounded text-center">
               <div className="font-semibold">{type.charAt(0).toUpperCase() + type.slice(1)}</div>
@@ -257,52 +254,55 @@ export default function Page() {
       </div>
 
       {/* Task List */}
-      <div className="space-y-3">
-        {tasks.filter((t) => selectedDay ? t.day === selectedDay : true).map((task) => (
-          <div
-            key={task.id}
-            className={`p-3 rounded flex justify-between items-center transition ${
-              mokel ? "bg-purple-600 hover:bg-purple-500" : "bg-gray-800 hover:bg-gray-700"
-            }`}
-          >
-            <div>
-              <span className="font-bold">{task.type}</span>: {task.content} (Day {task.day}) - <span className="font-semibold">{STATUS(task.progress)}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-24 bg-gray-700 h-4 rounded overflow-hidden">
-                <div className={`${STATUS_COLOR(task.progress, mokel)} h-4`} style={{ width: `${task.progress}%` }} />
+      <div className="flex flex-col gap-3">
+        {tasks.filter((t) => selectedDay ? t.day === selectedDay : true).map((task) => {
+          const isMokel = mokelDays.includes(task.day);
+          return (
+            <div
+              key={task.id}
+              className={`p-3 rounded flex flex-col md:flex-row md:justify-between md:items-center transition gap-2 ${
+                isMokel ? "bg-purple-600 hover:bg-purple-500" : "bg-gray-800 hover:bg-gray-700"
+              }`}
+            >
+              <div>
+                <span className="font-bold">{task.type}</span>: {task.content} (Day {task.day}) - <span className="font-semibold">{STATUS(task.progress)}</span>
               </div>
-              {!mokel && task.progress < 100 && (
+              <div className="flex flex-wrap items-center gap-2 mt-2 md:mt-0">
+                <div className="w-32 bg-gray-700 h-4 rounded overflow-hidden">
+                  <div className={`${STATUS_COLOR(task.progress, isMokel)} h-4`} style={{ width: `${task.progress}%` }} />
+                </div>
+                {!isMokel && task.progress < 100 && (
+                  <button
+                    onClick={() => handleSubmit(task.type, task.content, 50)}
+                    className="bg-yellow-600 px-2 rounded text-sm hover:bg-yellow-500 transition"
+                  >
+                    In Process
+                  </button>
+                )}
+                {!isMokel && task.progress < 100 && task.progress > 0 && (
+                  <button
+                    onClick={() => handleSubmit(task.type, task.content, 100)}
+                    className="bg-green-600 px-2 rounded text-sm hover:bg-green-500 transition"
+                  >
+                    Success
+                  </button>
+                )}
                 <button
-                  onClick={() => handleSubmit(task.type, task.content, 50)}
-                  className="bg-yellow-600 px-2 rounded text-sm hover:bg-yellow-500 transition"
+                  onClick={() => startEdit(task)}
+                  className="bg-blue-600 px-2 rounded text-sm hover:bg-blue-500 transition"
                 >
-                  In Process
+                  Edit
                 </button>
-              )}
-              {!mokel && task.progress < 100 && task.progress > 0 && (
                 <button
-                  onClick={() => handleSubmit(task.type, task.content, 100)}
-                  className="bg-green-600 px-2 rounded text-sm hover:bg-green-500 transition"
+                  onClick={() => handleDelete(task.id)}
+                  className="bg-red-600 px-2 rounded text-sm hover:bg-red-500 transition"
                 >
-                  Success
+                  Delete
                 </button>
-              )}
-              <button
-                onClick={() => startEdit(task)}
-                className="bg-blue-600 px-2 rounded text-sm hover:bg-blue-500 transition"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => handleDelete(task.id)}
-                className="bg-red-600 px-2 rounded text-sm hover:bg-red-500 transition"
-              >
-                Delete
-              </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <footer className="mt-10 text-center text-gray-400 text-sm">© Ramadan Dashboard</footer>

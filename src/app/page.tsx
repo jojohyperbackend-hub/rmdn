@@ -18,7 +18,7 @@ type Task = {
 const STATUS = (progress: number) =>
   progress === 0 ? "Not Ready" : progress < 100 ? "In Process" : "Success";
 
-const STATUS_COLOR = (progress: number, mokel: boolean = false) =>
+const STATUS_COLOR = (progress: number, mokel = false) =>
   mokel
     ? "bg-purple-600"
     : progress === 0
@@ -32,7 +32,6 @@ export default function Page() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-
   const [mokelDays, setMokelDays] = useState<number[]>([]);
 
   const [todo, setTodo] = useState("");
@@ -58,16 +57,15 @@ export default function Page() {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     fetchTasks();
     const interval = setInterval(fetchTasks, 3000);
     return () => {
       clearInterval(interval);
-      unsubscribe();
+      unsub();
     };
   }, [user]);
 
-  // ✅ FIX UTAMA DI SINI
   const handleSubmit = async (
     type: TaskType,
     content: string,
@@ -77,25 +75,20 @@ export default function Page() {
 
     const existingTask = tasks.find((t) => t.id === editingId);
 
-    let payload: Task;
-
-    if (editingId && existingTask) {
-      // UPDATE TASK SPESIFIK
-      payload = {
-        ...existingTask,
-        content,
-        progress: setProgressTo ?? existingTask.progress,
-      };
-    } else {
-      // CREATE TASK BARU (STACK)
-      payload = {
-        user_id: user.uid,
-        type,
-        content,
-        day: selectedDay,
-        progress: setProgressTo ?? 0,
-      };
-    }
+    const payload: Task =
+      editingId && existingTask
+        ? {
+            ...existingTask,
+            content,
+            progress: setProgressTo ?? existingTask.progress,
+          }
+        : {
+            user_id: user.uid,
+            type,
+            content,
+            day: selectedDay,
+            progress: setProgressTo ?? 0,
+          };
 
     const res = await fetch("/api/crud", {
       method: "POST",
@@ -103,7 +96,7 @@ export default function Page() {
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) throw new Error("Failed submit task");
+    if (!res.ok) return;
 
     fetchTasks();
     setEditingId(null);
@@ -120,10 +113,10 @@ export default function Page() {
 
   const startEdit = (task: Task) => {
     setEditingId(task.id || null);
+    setSelectedDay(task.day);
     if (task.type === "todo") setTodo(task.content);
     if (task.type === "hapalan") setHapalan(task.content);
     if (task.type === "planner") setPlanner(task.content);
-    setSelectedDay(task.day);
   };
 
   const tasksByDay = Array.from({ length: 30 }, (_, i) =>
@@ -137,122 +130,149 @@ export default function Page() {
     else statusCount.success++;
   });
 
-  const progressByType = (type: TaskType) => {
-    const ts = tasks.filter((t) => t.type === type);
-    if (!ts.length) return 0;
-    return Math.round(ts.reduce((a, b) => a + b.progress, 0) / ts.length);
-  };
-
   if (!user)
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
-        <button onClick={login} className="bg-yellow-600 px-6 py-3 rounded">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white px-4">
+        <button
+          onClick={login}
+          className="px-8 py-4 rounded-xl bg-yellow-600 hover:bg-yellow-500 transition shadow-xl text-lg"
+        >
           Sign in with Google
         </button>
       </div>
     );
 
   return (
-    <div className="p-4 max-w-6xl mx-auto min-h-screen bg-gray-900 text-white flex flex-col gap-6">
+    <div className="min-h-screen bg-gray-950 text-white px-4 py-6 md:px-8">
+      <div className="max-w-7xl mx-auto flex flex-col gap-6">
 
-      <div className="flex justify-between">
-        <h1 className="text-3xl font-bold">Dashboard Ramadan</h1>
-        <button onClick={logout} className="bg-red-600 px-4 py-2 rounded">
-          Logout
-        </button>
-      </div>
-
-      {/* Kalender */}
-      <div className="grid grid-cols-7 gap-2">
-        {tasksByDay.map((dayTasks, idx) => {
-          const day = idx + 1;
-          const isMokel = mokelDays.includes(day);
-
-          let color = "bg-gray-800";
-
-          if (!dayTasks.length) color = "bg-red-600";
-          else {
-            const maxProgress = Math.max(...dayTasks.map((t) => t.progress));
-            color = STATUS_COLOR(maxProgress, isMokel);
-          }
-
-          return (
-            <button
-              key={day}
-              onClick={() => setSelectedDay(day)}
-              className={`p-4 rounded ${color}`}
-            >
-              {day}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Forms */}
-      {selectedDay && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-          <form onSubmit={(e) => { e.preventDefault(); handleSubmit("todo", todo); }} className="bg-gray-800 p-4 rounded">
-            <h3>Todo</h3>
-            <input value={todo} onChange={(e) => setTodo(e.target.value)} className="p-2 w-full bg-gray-700 rounded"/>
-            <button className="bg-yellow-500 px-4 py-2 mt-2 rounded">
-              {editingId ? "Update" : "Add"}
-            </button>
-          </form>
-
-          <form onSubmit={(e) => { e.preventDefault(); handleSubmit("hapalan", hapalan); }} className="bg-gray-800 p-4 rounded">
-            <h3>Hapalan</h3>
-            <input value={hapalan} onChange={(e) => setHapalan(e.target.value)} className="p-2 w-full bg-gray-700 rounded"/>
-            <button className="bg-yellow-500 px-4 py-2 mt-2 rounded">
-              {editingId ? "Update" : "Add"}
-            </button>
-          </form>
-
-          <form onSubmit={(e) => { e.preventDefault(); handleSubmit("planner", planner); }} className="bg-gray-800 p-4 rounded">
-            <h3>Planner</h3>
-            <input value={planner} onChange={(e) => setPlanner(e.target.value)} className="p-2 w-full bg-gray-700 rounded"/>
-            <button className="bg-yellow-500 px-4 py-2 mt-2 rounded">
-              {editingId ? "Update" : "Add"}
-            </button>
-          </form>
-
-          {/* Chat tidak disimpan */}
-          <div className="bg-gray-800 p-4 rounded">
-            <h3>Chat</h3>
-            <input
-              value={chat}
-              onChange={(e) => setChat(e.target.value)}
-              className="p-2 w-full bg-gray-700 rounded"
-            />
-          </div>
-
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
+          <h1 className="text-2xl md:text-3xl font-bold">
+            Ramadan Dashboard
+          </h1>
+          <button
+            onClick={logout}
+            className="px-4 py-2 bg-red-600 rounded-lg hover:bg-red-500 transition"
+          >
+            Logout
+          </button>
         </div>
-      )}
 
-      {/* Summary */}
-      <div className="flex gap-4">
-        <div className="bg-red-700 px-4 py-2 rounded">Not Ready: {statusCount.notReady}</div>
-        <div className="bg-yellow-600 px-4 py-2 rounded">In Process: {statusCount.inProcess}</div>
-        <div className="bg-green-600 px-4 py-2 rounded">Success: {statusCount.success}</div>
-      </div>
+        {/* Kalender */}
+        <div className="grid grid-cols-5 sm:grid-cols-7 gap-2">
+          {tasksByDay.map((dayTasks, idx) => {
+            const day = idx + 1;
+            const isMokel = mokelDays.includes(day);
 
-      {/* Task List */}
-      <div className="flex flex-col gap-2">
-        {tasks.filter(t => selectedDay ? t.day === selectedDay : true).map(task => (
-          <div key={task.id} className="bg-gray-800 p-3 rounded flex justify-between">
-            <div>
-              {task.type}: {task.content} - {STATUS(task.progress)}
+            let color = "bg-gray-800";
+            if (!dayTasks.length) color = "bg-red-600";
+            else {
+              const maxProgress = Math.max(...dayTasks.map((t) => t.progress));
+              color = STATUS_COLOR(maxProgress, isMokel);
+            }
+
+            return (
+              <button
+                key={day}
+                onClick={() => setSelectedDay(day)}
+                className={`aspect-square rounded-lg ${color} flex items-center justify-center font-semibold hover:scale-105 transition`}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Forms */}
+        {selectedDay && (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            <form onSubmit={(e) => { e.preventDefault(); handleSubmit("todo", todo); }}
+              className="bg-gray-900 p-4 rounded-xl flex flex-col gap-2">
+              <h3 className="font-semibold">Todo</h3>
+              <input value={todo} onChange={(e)=>setTodo(e.target.value)}
+                className="p-2 rounded bg-gray-800 outline-none focus:ring-2 focus:ring-yellow-500"/>
+              <button className="bg-yellow-600 py-2 rounded hover:bg-yellow-500 transition">
+                {editingId ? "Update" : "Add"}
+              </button>
+            </form>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleSubmit("hapalan", hapalan); }}
+              className="bg-gray-900 p-4 rounded-xl flex flex-col gap-2">
+              <h3 className="font-semibold">Hapalan</h3>
+              <input value={hapalan} onChange={(e)=>setHapalan(e.target.value)}
+                className="p-2 rounded bg-gray-800 outline-none focus:ring-2 focus:ring-yellow-500"/>
+              <button className="bg-yellow-600 py-2 rounded hover:bg-yellow-500 transition">
+                {editingId ? "Update" : "Add"}
+              </button>
+            </form>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleSubmit("planner", planner); }}
+              className="bg-gray-900 p-4 rounded-xl flex flex-col gap-2">
+              <h3 className="font-semibold">Planner</h3>
+              <input value={planner} onChange={(e)=>setPlanner(e.target.value)}
+                className="p-2 rounded bg-gray-800 outline-none focus:ring-2 focus:ring-yellow-500"/>
+              <button className="bg-yellow-600 py-2 rounded hover:bg-yellow-500 transition">
+                {editingId ? "Update" : "Add"}
+              </button>
+            </form>
+
+            <div className="bg-gray-900 p-4 rounded-xl flex flex-col gap-2 sm:col-span-2 lg:col-span-3">
+              <h3 className="font-semibold">Chat (not saved)</h3>
+              <input value={chat} onChange={(e)=>setChat(e.target.value)}
+                className="p-2 rounded bg-gray-800 outline-none"/>
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => handleSubmit(task.type, task.content, 50)} className="bg-yellow-600 px-2 rounded">Process</button>
-              <button onClick={() => handleSubmit(task.type, task.content, 100)} className="bg-green-600 px-2 rounded">Success</button>
-              <button onClick={() => startEdit(task)} className="bg-blue-600 px-2 rounded">Edit</button>
-              <button onClick={() => handleDelete(task.id)} className="bg-red-600 px-2 rounded">Delete</button>
-            </div>
+
           </div>
-        ))}
-      </div>
+        )}
 
+        {/* Summary */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-red-700 rounded-lg p-3 text-center">Not Ready: {statusCount.notReady}</div>
+          <div className="bg-yellow-600 rounded-lg p-3 text-center">In Process: {statusCount.inProcess}</div>
+          <div className="bg-green-600 rounded-lg p-3 text-center">Success: {statusCount.success}</div>
+        </div>
+
+        {/* Task List */}
+        <div className="flex flex-col gap-3">
+          {tasks.filter(t => selectedDay ? t.day === selectedDay : true).map(task => (
+            <div key={task.id}
+              className="bg-gray-900 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+
+              <div className="text-sm md:text-base">
+                <span className="font-semibold">{task.type}</span> • {task.content}
+                <span className="ml-2 text-gray-400">({STATUS(task.progress)})</span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {task.progress < 100 && (
+                  <button onClick={()=>handleSubmit(task.type, task.content, 50)}
+                    className="bg-yellow-600 px-3 py-1 rounded hover:bg-yellow-500 transition">
+                    Process
+                  </button>
+                )}
+                {task.progress < 100 && task.progress > 0 && (
+                  <button onClick={()=>handleSubmit(task.type, task.content, 100)}
+                    className="bg-green-600 px-3 py-1 rounded hover:bg-green-500 transition">
+                    Success
+                  </button>
+                )}
+                <button onClick={()=>startEdit(task)}
+                  className="bg-blue-600 px-3 py-1 rounded hover:bg-blue-500 transition">
+                  Edit
+                </button>
+                <button onClick={()=>handleDelete(task.id)}
+                  className="bg-red-600 px-3 py-1 rounded hover:bg-red-500 transition">
+                  Delete
+                </button>
+              </div>
+
+            </div>
+          ))}
+        </div>
+
+      </div>
     </div>
   );
 }
